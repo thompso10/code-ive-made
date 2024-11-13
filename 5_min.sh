@@ -54,10 +54,10 @@ fi
 #delete python because fuck you
 
 # Uninstall Python 3
-sudo apt remove --purge python3
+#sudo apt remove --purge python3
 
 # Uninstall Python 2 (if applicable)
-sudo apt remove --purge python2
+#sudo apt remove --purge python2
 
 # Clean up any residual packages
 sudo apt autoremove -y
