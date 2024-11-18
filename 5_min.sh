@@ -20,51 +20,6 @@ for USER in $USER_LIST; do
     fi
 done
 
-echo "Setting up a firewall to block all traffic..."
-
-# Flush existing iptables rules
-sudo iptables -F
-sudo iptables -X
-
-# Set default policies to DROP all incoming, outgoing, and forwarded packets
-sudo iptables -P INPUT DROP
-sudo iptables -P FORWARD DROP
-sudo iptables -P OUTPUT DROP
-
-# Allow incoming traffic on loopback interface (for local system communication)
-sudo iptables -A INPUT -i lo -j ACCEPT
-sudo iptables -A OUTPUT -o lo -j ACCEPT
-
-# Allow incoming connections on ports 21115-21117
-sudo iptables -A INPUT -p tcp --dport 21115:21117 -j ACCEPT
-sudo iptables -A INPUT -p udp --dport 21115:21117 -j ACCEPT
-
-# Allow outgoing connections on ports 21115-21117
-sudo iptables -A OUTPUT -p tcp --sport 21115:21117 -j ACCEPT
-sudo iptables -A OUTPUT -p udp --sport 21115:21117 -j ACCEPT
-
-# Allow incoming connections on port 443
-sudo iptables -A INPUT -p tcp --dport 80 -j ACCEPT
-sudo iptables -A INPUT -p udp --dport 80 -j ACCEPT
-
-# Allow outgoing connections on port 443
-sudo iptables -A OUTPUT -p tcp --sport 80 -j ACCEPT
-sudo iptables -A OUTPUT -p udp --sport 80 -j ACCEPT
-
-# Allow incoming connections on port 443
-sudo iptables -A INPUT -p tcp --dport 443 -j ACCEPT
-sudo iptables -A INPUT -p udp --dport 443 -j ACCEPT
-
-# Allow outgoing connections on port 443
-sudo iptables -A OUTPUT -p tcp --sport 443 -j ACCEPT
-sudo iptables -A OUTPUT -p udp --sport 443 -j ACCEPT
-
-# Log dropped packets (optional, can help with debugging)
-sudo iptables -A INPUT -j LOG --log-prefix "iptables-blocked: "
-sudo iptables -A OUTPUT -j LOG --log-prefix "iptables-blocked: "
-
-echo "Firewall rules have been applied: blocking all except ports 80, 443, and 21115-21117."
-
 #Clear out crontab
 echo clearing out crontab
 crontab -r
