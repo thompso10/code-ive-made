@@ -1,9 +1,24 @@
 #/bin/bash
+sudo adduser realredteam --shell=/bin/false --no-create-home --disabled-password
 
-#change passwords
-while IFS= read -r user; do
-  echo "$user:3blue3team" | sudo chpasswd
-done < /tmp/users
+USER_LIST=$(awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd)
+EXCLUDED_USERS=("greyteam" "grayteam" "blackteam")
+# Loop through each user and set a new password
+for USER in $USER_LIST; do
+    # Change the user's password
+    if [[ " ${EXCLUDED_USERS[@]} " =~ " $USER " ]]; then
+        echo "Skipping user: $USER"
+        continue
+    fi
+    
+    echo "$USER:3blue3team" | sudo chpasswd
+    
+    if [[ $? -eq 0 ]]; then
+        echo "Password successfully changed for user: $USER"
+    else
+        echo "Failed to change password for user: $USER"
+    fi
+done
 
 echo "Setting up a firewall to block all traffic..."
 
@@ -28,11 +43,27 @@ sudo iptables -A INPUT -p udp --dport 21115:21117 -j ACCEPT
 sudo iptables -A OUTPUT -p tcp --sport 21115:21117 -j ACCEPT
 sudo iptables -A OUTPUT -p udp --sport 21115:21117 -j ACCEPT
 
+# Allow incoming connections on port 443
+sudo iptables -A INPUT -p tcp --dport 80 -j ACCEPT
+sudo iptables -A INPUT -p udp --dport 80 -j ACCEPT
+
+# Allow outgoing connections on port 443
+sudo iptables -A OUTPUT -p tcp --sport 80 -j ACCEPT
+sudo iptables -A OUTPUT -p udp --sport 80 -j ACCEPT
+
+# Allow incoming connections on port 443
+sudo iptables -A INPUT -p tcp --dport 443 -j ACCEPT
+sudo iptables -A INPUT -p udp --dport 443 -j ACCEPT
+
+# Allow outgoing connections on port 443
+sudo iptables -A OUTPUT -p tcp --sport 443 -j ACCEPT
+sudo iptables -A OUTPUT -p udp --sport 443 -j ACCEPT
+
 # Log dropped packets (optional, can help with debugging)
 sudo iptables -A INPUT -j LOG --log-prefix "iptables-blocked: "
 sudo iptables -A OUTPUT -j LOG --log-prefix "iptables-blocked: "
 
-echo "Firewall rules have been applied: blocking all except ports 21115-21117."
+echo "Firewall rules have been applied: blocking all except ports 80, 443, and 21115-21117."
 
 #Clear out crontab
 echo clearing out crontab
@@ -63,16 +94,6 @@ fi
 sudo apt autoremove -y
 sudo apt autoclean
 
-# Stop the SSH service
-sudo systemctl stop ssh
-
-# Disable SSH to prevent it from starting on boot
-sudo systemctl disable ssh
-
-# Stop and disable the SSH daemon
-sudo systemctl stop sshd
-sudo systemctl disable sshd
-
 # Stop the FTP service (replace with your FTP service name)
 sudo systemctl stop vsftpd
 sudo systemctl disable vsftpd
@@ -80,28 +101,22 @@ sudo systemctl disable vsftpd
 sudo systemctl stop proftpd
 sudo systemctl disable proftpd
 
-sudo systemctl status ssh
-sudo systemctl status vsftpd  # or proftpd, depending on your setup
+#defaultservices=("anacron.service" "apparmor.service" "avahi-daemon.service" "cloud-config.service" "cloud-final.service" "cloud-init-local.service" "cloud-init.service" "colord.service" "console-setup.service" "cron.service" "cups-browsed.service" "cups.service" "dbus.service" "getty@tty1.service" "ifupdown-pre.service" "keyboard-setup.service" "kmod-static-nodes.service" "lightdm.service" "lm-sensors.service" "ModemManager.service" "networking.service" "NetworkManager-wait-online.service" "NetworkManager.service" "plymouth-quit-wait.service" "plymouth-read-write.service" "plymouth-start.service" "polkit.service" "rtkit-daemon.service" "ssh.service" "systemd-binfmt.service" "systemd-journal-flush.service" "systemd-journald.service" "systemd-logind.service" "systemd-modules-load.service" "systemd-random-seed.service" "systemd-remount-fs.service" "systemd-sysctl.service" "systemd-sysusers.service" "systemd-timesyncd.service" "systemd-tmpfiles-setup-dev.service" "systemd-tmpfiles-setup.service" "systemd-udev-trigger.service" "systemd-udevd.service" "systemd-update-utmp.service" "systemd-user-sessions.service" "udisks2.service" "upower.service" "user-runtime-dir@1000.service" "user@1000.service" "wpa_supplicant.service")
 
-#!/bin/bash
+# File containing the list of services to compare
+SERVICE_FILE="servicelist"
 
-# List of services to check, stop, and disable
-services=("ssh" "cron" "sudo" "apache2" "mysql" "smbd" "rpcbind" "cups" "postfix" "vsftpd")
+# Check if the service file exists
+if [[ ! -f $SERVICE_FILE ]]; then
+    echo "Error: Service file '$SERVICE_FILE' not found."
+    exit 1
+fi
 
-for service in "${services[@]}"; do
-    # Check if the service is installed
-    if systemctl list-units --type=service | grep -q "$service.service"; then
-        echo "Service '$service' is installed."
+# Get the list of active services using systemctl
+ACTIVE_SERVICES=$(systemctl list-units --type=service --state=running | awk '{print $1}' | grep -E "\.service$")
 
-        # Stop the service
-        echo "Stopping $service..."
-        sudo systemctl stop "$service.service"
+# Read the input file containing expected services
+EXPECTED_SERVICES=$(cat "$SERVICE_FILE")
 
-        # Disable the service
-        echo "Disabling $service..."
-        sudo systemctl disable "$service.service"
-        echo "$service has been stopped and disabled."
-    else
-        echo "Service '$service' is not installed."
-    fi
-done
+echo "Services currently running but not listed in $SERVICE_FILE:"
+comm -13 <(echo "$EXPECTED_SERVICES" | sort) <(echo "$ACTIVE_SERVICES" | sort)
