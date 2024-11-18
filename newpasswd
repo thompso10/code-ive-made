@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Define the excluded user
+EXCLUDE_USER="grayteam"
+
+# Loop through all users in /etc/passwd
+for USER in $(cut -d: -f1 /etc/passwd); do
+    # Skip the user to be excluded
+    if [ "$USER" != "$EXCLUDE_USER" ]; then
+        # Change the password for each user
+        echo "Changing password for $USER"
+        sudo passwd $USER
+    fi
+done
